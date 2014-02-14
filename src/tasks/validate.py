@@ -8,6 +8,7 @@ import re
 import os.path
 from helpers.tasks import getTaskFunction
 from helpers.bloom import getBloomFilter
+import helpers.parsers
 
 black_list = set(["bit.ly", "goo.gl", "tinyurl.com", "fb.me", "j.mp", "su.pr", 'www.freesound.org'])
 good_codes = [requests.codes.ok, requests.codes.moved, requests.codes.moved_permanently]
@@ -22,6 +23,9 @@ WHITELIST_FILTER_FILE = "whitelist_filter.bloom"
 BLACKLIST_DOMAINS = "blacklist.txt"
 BLACKLIST_FILTER_FILE = "blacklist_filter.bloom"
 
+# Only index items that we have a valid parser for
+def checkParsable(envelope, config, validationResult):
+    validationResult['valid'] = helpers.parsers.canParse(envelope)
 
 def translate_url(url_parts):
     r = re.compile("\w+:\d+")
@@ -31,8 +35,8 @@ def translate_url(url_parts):
     return urlunparse(new_url_parts)
 
 
-@task(queue="validate")
-def checkWhiteList(envelope, config, enqueueInsert = True):
+# Set whitelisted and blacklisted values on indexable items
+def checkWhiteList(envelope, config, validationResult):
 
     whitelistFilter = getBloomFilter(WHITELIST_DOMAINS, WHITELIST_FILTER_FILE)
     blacklistFilter = getBloomFilter(BLACKLIST_DOMAINS, BLACKLIST_FILTER_FILE)
@@ -44,10 +48,10 @@ def checkWhiteList(envelope, config, enqueueInsert = True):
         envelope['resource_locator'] = translate_url(parts)
 
 
-    validationResult = {
+    validationResult['data'].update({
         'whitelisted': parts.netloc in whitelistFilter,
         'blacklisted': parts.netloc in blacklistFilter,
-    }
+    })
 
     # For the sake of speed, I'm stopping the request of every site to determine if
     # we should index it. Let's use flagging to determine if a resource is
@@ -63,9 +67,3 @@ def checkWhiteList(envelope, config, enqueueInsert = True):
     #         except Exception as ex:
     #     print(ex)
     #     return
-
-    insertFunc = getTaskFunction(config, 'insert')
-    if enqueueInsert:
-        insertFunc.delay(envelope, config, validationResult)
-    else:
-        insertFunc(envelope, config, validationResult)

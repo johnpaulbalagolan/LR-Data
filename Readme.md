@@ -30,7 +30,7 @@ All configuration is done in the src/celeryconfig.py file.  For information of c
 		"tasks": {
 			"insert": "tasks.save.insertDocumentMongo",
 
-			"validation": "tasks.validate.emptyValidate",
+			"validate": "tasks.validate.emptyValidate",
 		}
 
 		"redis":{
@@ -55,7 +55,7 @@ All configuration is done in the src/celeryconfig.py file.  For information of c
 		},
     }
 
-Customizable tasks are defined in the `tasks` hash.  `validation` is the task name for validating incoming docs.  `insert` is the task you wish to use to save the data
+Customizable tasks are defined in the `tasks` hash.  `validate` is the task name for validating incoming docs.  `insert` is the task you wish to use to save the data
 
 #Startup
 There are scripts inside of src to get you started.

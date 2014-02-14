@@ -18,13 +18,15 @@ def getBloomFilter(contentFile, filterFilename):
 
     if contentFile not in FILTERS:
 
-        FILTERS[contentFile] = set()
+        filterSet = set()
 
         with open(contentFile, "r") as f:
             for domain in f:
                 d = domain.rstrip()
 
-                FILTERS[contentFile].add(d)
+                filterSet.add(d)
+
+        FILTERS[contentFile] = filterSet
 
 
     return FILTERS[contentFile]

@@ -32,4 +32,4 @@ done
 # Create a file to record number of workers we are starting (for stop script)
 echo $WORKERS > .celery_workers
 
-celeryd-multi start $WORKERS -l INFO -Q:1 harvest,image -Q:2 validate -Q save
+celeryd-multi start $WORKERS -l INFO -Q:1 harvest,image -Q:2 validate,parse -Q save

@@ -15,7 +15,7 @@ import traceback
 log = get_default_logger()
 
 
-@task(queue="harvest")
+@task(queue="harvest", ignore_result=True)
 def startHarvest(config):
     try:
         lrUrl = config['lrUrl']
@@ -48,7 +48,7 @@ def startHarvest(config):
         startHarvest.retry(exc=ex, countdown=10, max_retries=5)
 
 
-@task(queue="harvest")
+@task(queue="harvest", ignore_result=True)
 def harvestData(lrUrl, config, enqueueValidate = True):
     try:
         r = redis.StrictRedis(host=config['redis']['host'],
@@ -65,7 +65,7 @@ def harvestData(lrUrl, config, enqueueValidate = True):
             envelope = i['record']['resource_data']
             r.sadd("harvested_docs", envelope['doc_ID'])
 
-            validateFunc = getTaskFunction(config, 'validation')
+            validateFunc = getTaskFunction(config, 'validate')
 
             if enqueueValidate:
                 validateFunc.delay(envelope, config)

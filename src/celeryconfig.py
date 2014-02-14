@@ -7,12 +7,20 @@ config = {
         "standardsDb": "http://localhost:5984/standards",
     },
     "tasks": {
-        "insert": "tasks.elasticsearch.save.insertDoc",
-        "validation": "tasks.validate.checkWhiteList",
+        "save": [
+            "tasks.elasticsearch.save.indexDoc",
+        ],
+        "validate": [
+            "tasks.validate.checkParsable",
+            "tasks.validate.checkWhiteList",
+        ],
+        "parse": [
+            "tasks.parse.parseEnvelope"
+        ],
     },
     "redis": {
         "host": "localhost",
-        "port": 6379,
+        "port": 6380,
         "db": 0
     },
     "elasticsearch": {
@@ -20,11 +28,13 @@ config = {
         "host": "localhost",
         "port": "9200",
         "bulk_size": 400,
-        "timeout": 30.0
+        "timeout": 30.0,
+        "index_name": "lr",
+        "doc_type": "lr_doc"
     }
 }
 # List of modules to import when celery starts.
-CELERY_IMPORTS = ("tasks.harvest", "tasks.save", "tasks.validate", "tasks.elasticsearch.save", )
+CELERY_IMPORTS = ("tasks.harvest", "helpers.tasks", )
 
 ## Result store settings.
 ## Broker settings.
