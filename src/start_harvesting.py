@@ -1,5 +1,7 @@
+#!/usr/bin/env python
+
 from tasks.harvest import *
 from celeryconfig import config
-from redis import StrictRedis
-r = StrictRedis(db=0)
+
+# start the harvest process
 startHarvest(config)

@@ -19,7 +19,7 @@ FORMAT = '%(message)s'
 basicConfig(format=FORMAT)
 log = getLogger(__name__)
 docs = {}
-def load(file_name='mapping.csv'):
+def load(file_name='standards_mapping.csv'):
     result = {}
     with open(file_name, 'r') as f:
         r = csv.reader(f)
@@ -33,12 +33,12 @@ def load(file_name='mapping.csv'):
 def handle_alignmentt(item):
     props = item.get('properties', {})
     for name in props.get("targetName"):
-        yield name    
+        yield name
 def get_standards(props, mapping):
     keys = []
     for i in props:
         for name in handle_alignmentt(i):
-            keys.append(mapping.get(name, name))    
+            keys.append(mapping.get(name, name))
     return keys
 def getItemFromList(lst):
 	if lst:
@@ -64,7 +64,7 @@ def harvest(params, mapping):
 			m.update(envelope['resource_locator'])
 			doc_id = m.hexdigest()
 			d = None
-			if "properties" not in envelope['resource_data']:				
+			if "properties" not in envelope['resource_data']:
 				continue
 			if doc_id not in docs:
 				docs[doc_id] = {
@@ -74,11 +74,11 @@ def harvest(params, mapping):
 					"publisher": envelope['identity']['owner'],
 					"url": envelope['resource_locator']
 					"keywords": {}
-				}				
+				}
 			d = docs[doc_id]
 			def add_keys(keys):
 				for k in (k.lower() for k in keys):
-					d['keywords'][k] = d['keywords'].get(k,0) + 1				
+					d['keywords'][k] = d['keywords'].get(k,0) + 1
 			add_keys(envelope.get("keys", []))
 			add_keys(nltk.word_tokenize(d.get("title","")))
 			add_keys(nltk.word_tokenize(d.get("description","")))
@@ -132,4 +132,4 @@ if __name__ == "__main__":
 					mult = 6
 				r.zadd(k, v * mult, doc['_id'])
 		except:
-			pass		
+			pass

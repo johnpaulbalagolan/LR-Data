@@ -4,10 +4,10 @@ from urlparse import urljoin
 import csv
 
 
-def get_standards_page():   
-    def page(url):  
+def get_standards_page():
+    def page(url):
         d = pq(url=url)
-        links = d("td.views-field-title a") 
+        links = d("td.views-field-title a")
         for l in links:
             u = urljoin(url, l.attrib['href'])
             yield u
@@ -28,7 +28,7 @@ def get_json_links(page_url):
             yield url
 
 
-def process_doc(url):   
+def process_doc(url):
     def process(data):
         for s in data:
             guid = None
@@ -58,7 +58,7 @@ def process_doc(url):
 
 
 def main():
-    with open('mapping.csv', 'w') as f:
+    with open('standards_mapping.csv', 'w') as f:
         w = csv.writer(f)
         for standard in get_standards_page():
             for url in get_json_links(standard):

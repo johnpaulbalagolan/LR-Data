@@ -1,111 +1,83 @@
-import couchdb
-from pprint import pprint
-import traceback
-import urlparse
 from celery.task import task
 from celery.log import get_default_logger
-import redis
-import nltk
-from nltk.stem.snowball import PorterStemmer
-import requests
-import urllib2
-import hashlib
-import urlparse
-from lxml import etree
-from StringIO import StringIO
-import subprocess
-from BeautifulSoup import BeautifulSoup
-import os
 from celery import group, chain, chord
-import pyes
-import csv
 from celeryconfig import config
 
+import pyes
+
+import urlparse
+import urllib2
+import requests
+import hashlib
+
+from BeautifulSoup import BeautifulSoup
+from lxml import etree
+import nltk
+from nltk.stem.snowball import PorterStemmer
+
+import traceback
+import subprocess
+import os
+import csv
+
+
 log = get_default_logger()
-db = couchdb.Database(config['couchdb']['dbUrl'])
+
+
 conn = pyes.ES(
     config['elasticsearch']['host']+":"+config['elasticsearch']['port'],
     timeout=config['elasticsearch']['timeout'],
     bulk_size=config['elasticsearch']['bulk_size']
 )
 
-r = redis.StrictRedis(
-    host=config['redis']['host'],
-    port=config['redis']['port'],
-    db=config['redis']['db']
-)
 INDEX_NAME = "lr"
 DOC_TYPE = "lr_doc"
 
-def process_complex_keys(keys):
-    new_keys = []
-    for k in keys:
-        new_keys.append(k)
-	try:
-            parts = nltk.word_tokenize(k)
-            new_keys.extend(parts)
-        except:
-            pass
+def md5_hash(text):
+    return hashlib.md5(text).hexdigest()
 
-    # return a unique set of keys (nltk will create duplicate values for single-word keys)
-    return set(new_keys)
+def _send_doc(doc, doc_id):
+    update_function = """
+        if(title != null){ctx._source.title = title;}
 
-def index(doc, doc_id):
-    update_function = 'if(title != null){ctx._source.title = title;}'+\
-                      'if(description != null){ctx._source.description = description;}'+\
-                      'if(publisher != null){ctx._source.publisher = publisher;}'+\
-                      'for(String key: keys){'+\
-                      'if(!ctx._source.keys.contains(key)){'+\
-                      'ctx._source.keys.add(key);'+\
-                      '}'+\
-                      '}'+\
-                      'for(String key: standards){'+\
-                      'if(!ctx._source.standards.contains(key)){'+\
-                      'ctx._source.standards.add(key);'+\
-                      '}'+\
-                      '}'+\
-                      'for(String key: mediaFeatures){'+\
-                      'if(!ctx._source.mediaFeatures.contains(key)){'+\
-                      'ctx._source.mediaFeatures.add(key);'+\
-                      '}'+\
-                      '}'+\
-                      'for(String key: accessMode){'+\
-                      'if(!ctx._source.accessMode.contains(key)){'+\
-                      'ctx._source.accessMode.add(key);'+\
-                      '}'+\
-                      '}'
-    doc['keys'] = [x for x in process_complex_keys(doc.get('keys', [])) if x is not None]
+        if(description != null){ctx._source.description = description;}
+
+        if(publisher != null){ctx._source.publisher = publisher;}
+
+        for(String key : keys){
+          if(!ctx._source.keys.contains(key)){
+            ctx._source.keys.add(key);
+          }
+        }
+        for(String key : standards){
+          if(!ctx._source.standards.contains(key)){
+            ctx._source.standards.add(key);
+          }
+        }
+        for(String key : mediaFeatures){
+          if(!ctx._source.mediaFeatures.contains(key)){
+            ctx._source.mediaFeatures.add(key);
+          }
+        }
+        for(String key : accessMode){
+          if(!ctx._source.accessMode.contains(key)){
+            ctx._source.accessMode.add(key);
+          }
+        }"""
+
+    doc['keys'] = set([x for x in doc.get('keys', []) if x is not None])
+
     for k, v in [('publisher', None), ('mediaFeatures', []), ('accessMode', []), ("description", None)]:
         if k not in doc:
             doc[k] = v
-    print(conn.partial_update(INDEX_NAME, DOC_TYPE, doc_id, update_function, upsert=doc, params=doc))
 
-def old_index(doc, doc_id):
-    def index_term(lst):
-        for ks in lst:
-            for k in nltk.word_tokenize(ks):
-                rank = 0.25
-                if k in doc.get('title', ''):
-                    rank *= 8
-                elif k in doc.get('description', ''):
-                    rank *= 4
-                print("Rank: {0} -- Total: {1}".format(rank, r.zincrby(k.lower(), doc_id, rank)))
-    doc['_id'] = doc_id
 
-    try:
-        print(db.save(doc))
-    except:
-        traceback.print_exc()
-    for k in ['keys', 'standards', 'accessMode', 'mediaFeatures']:
-        try:
-            index_term(doc.get(k, []))
-        except:
-            pass
-    for k in ['publisher', 'title', 'description']:
-        try:
-            index_term([doc.get(k)])
-        except:
-            pass
+    if(doc['url']):
+        doc['url_domain'] = urlparse.urlparse(doc['url']).netloc
+
+    updateResponse = conn.partial_update(INDEX_NAME, DOC_TYPE, doc_id, update_function, upsert=doc, params=doc)
+
+    print(updateResponse)
 
 
 
@@ -128,35 +100,51 @@ def get_html_display(url, publisher):
                 soup.html.head is not None and \
                 soup.html.head.title is not None:
             title = soup.html.head.title.string
-        raw = nltk.clean_html(raw)
-        tokens = nltk.word_tokenize(raw)
-        description = " ".join(tokens[:100])
+
+
+        description = None
+
+        # search meta tags for descriptions
+        for d in soup.findAll(attrs={"name": "description"}):
+            print d
+            if d['content'] is not None:
+                description = d['content']
+                break
+
+        # should we not find a description, make one out of the first 100 non-HTML words on the site
+        if description is None:
+            raw = nltk.clean_html(raw)
+            tokens = nltk.word_tokenize(raw)
+            description = " ".join(tokens[:100])
+
         return {
             "title": title,
             "description": description,
             "url": url,
             "publisher": publisher,
             "hasScreenshot": False
-            }
+        }
+
     except Exception as ex:
         return {
             "title": url,
             "description": url,
             "publisher": publisher,
-            "url" :url,
+            "url": url,
             "hasScreenshot": False
-            }
+        }
 
 def process_nsdl_dc(envelope, mapping):
-    md5 = hashlib.md5()
-    md5.update(envelope['resource_locator'])
-    doc_id = md5.hexdigest()
+    doc_id = md5_hash(envelope['resource_locator'])
+
     #parse the resource_data into an XML dom object
     dom = etree.fromstring(envelope['resource_data'])
     #dictionary containing XML namespaces and their prefixes
-    dc_namespaces = {"nsdl_dc": "http://ns.nsdl.org/nsdl_dc_v1.02/",
-                     "dc": "http://purl.org/dc/elements/1.1/",
-                     "dct": "http://purl.org/dc/terms/"}
+    dc_namespaces = {
+        "nsdl_dc": "http://ns.nsdl.org/nsdl_dc_v1.02/",
+         "dc": "http://purl.org/dc/elements/1.1/",
+         "dct": "http://purl.org/dc/terms/"
+     }
     # run an XPath query againt the dom object that pulls out all the document titles
     standards = dom.xpath('/nsdl_dc:nsdl_dc/dct:conformsTo',
                        namespaces=dc_namespaces)
@@ -169,7 +157,6 @@ def process_nsdl_dc(envelope, mapping):
         for s in ids:
             final_standards.append(s)
     try:
-        md5 = hashlib.md5()
         title = dom.xpath('/nsdl_dc:nsdl_dc/dc:title', namespaces=dc_namespaces)
         if title:
             title = title.pop().text
@@ -181,14 +168,14 @@ def process_nsdl_dc(envelope, mapping):
         else:
             description = envelope['resource_locator']
         doc = {
-        "title": title,
-        'publisher': envelope['identity']['submitter'],
-        'hasScreenshot': False,
-	"description": description,
-	"url": envelope['resource_locator'],
-        "keys": keys,
-        "standards": final_standards
-        }
+            "title": title,
+            'publisher': envelope['identity']['submitter'],
+            'hasScreenshot': False,
+            "description": description,
+            "url": envelope['resource_locator'],
+                "keys": keys,
+                "standards": final_standards
+            }
         return doc
     except Exception as ex:
         return {
@@ -197,7 +184,7 @@ def process_nsdl_dc(envelope, mapping):
             'publisher': envelope['identity']['submitter'],
             "url" :url,
             "hasScreenshot": False
-            }
+        }
 
 
 def process_lrmi(envelope, mapping):
@@ -205,15 +192,15 @@ def process_lrmi(envelope, mapping):
     url = envelope['resource_locator']
     resource_data = envelope.get('resource_data', {})
     if 'items' in resource_data:
-	properties = resource_data['items'].pop().get('properties', {})
+        properties = resource_data['items'].pop().get('properties', {})
     else:
         properties = resource_data.get('properties', {})
+
     educational_alignment = properties.get('educationalAlignment', [{}]).pop()
     educational_alignment_properties = educational_alignment.get('properties', {})
     standards_names = educational_alignment_properties.get('targetName', [''])
-    md5 = hashlib.md5()
-    md5.update(envelope['resource_locator'])
-    doc_id = md5.hexdigest()
+
+    doc_id = md5_hash(envelope['resource_locator'])
     keys = []
     keys.extend(envelope['keys'])
     keys.extend(properties.get('about', []))
@@ -234,11 +221,12 @@ def process_lrmi(envelope, mapping):
     else:
         publisher = idenity.get('owenr')
     name = properties.get('name')
+
     if isinstance(name, list):
-	name = name.pop()
-    description = properties.get('description')
-    if isinstance(description, list):
-        description = description.pop()
+        name = name.pop()
+        description = properties.get('description')
+        if isinstance(description, list):
+            description = description.pop()
 
     doc = {
         "url": envelope['resource_locator'],
@@ -249,6 +237,7 @@ def process_lrmi(envelope, mapping):
         'hasScreenshot': False,
         'publisher': publisher
     }
+
     try:
         return doc
     except Exception as ex:
@@ -294,9 +283,8 @@ def process_lr_para(envelope, mapping):
 def process_lom(data, mapping):
     url = data['resource_locator']
     try:
-        md5 = hashlib.md5()
-        md5.update(data['resource_locator'])
-        doc_id = md5.hexdigest()
+        doc_id = md5_hash(url)
+
         base_xpath = "//lom:lom/lom:general/lom:{0}/lom:string[@language='en-us' or @language='en-gb' or @language='en']"
         namespaces = {
             "lom": "http://ltsc.ieee.org/xsd/LOM"
@@ -456,13 +444,14 @@ def process_json_ld(envelope, mapping):
 
 def process_generic(envelope):
     url = envelope['resource_locator']
-    md5 = hashlib.md5()
-    md5.update(envelope['resource_locator'])
-    doc_id = md5.hexdigest()
+
+    doc_id = md5_hash(url)
+
     keys = envelope['keys']
     standards = []
+
     try:
-        doc = get_html_display(envelope['resource_locator'], envelope['identity']['submitter'])
+        doc = get_html_display(url, envelope['identity']['submitter'])
         doc['keys'] = keys
         doc['standards'] = standards
         return doc
@@ -476,35 +465,46 @@ def process_generic(envelope):
             "hasScreenshot": False
             }
 
+STANDARDS_MAP = None
+
 def load_standards(file_name):
-    mapping = {}
-    with open(file_name, 'r') as f:
-        reader = csv.reader(f)
-        for row in reader:
-            for item in row:
-                if 'asn.jesandco.org' in item:
-                    continue
-                for item2 in row:
-                    if item != item2:
-                        if 'asn.jesandco.org' in item2:
-                            item2 = item2[item2.rfind('/')+1:]
-                        else:
-                            continue
-                        key = item.lower()
-                        if key not in mapping:
-                            mapping[key] = []
-                        mapping[key].append(item2.lower())
-    return mapping
+    global STANDARDS_MAP
+
+    if not STANDARDS_MAP:
+        mapping = {}
+        with open(file_name, 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                for item in row:
+                    if 'asn.jesandco.org' in item:
+                        continue
+                    for item2 in row:
+                        if item != item2:
+                            if 'asn.jesandco.org' in item2:
+                                item2 = item2[item2.rfind('/')+1:]
+                            else:
+                                continue
+                            key = item.lower()
+                            if key not in mapping:
+                                mapping[key] = []
+                            mapping[key].append(item2.lower())
+
+        STANDARDS_MAP = mapping
+
+    return STANDARDS_MAP
 
 @task(queue="save")
-def createRedisIndex(envelope, config):
-    md5 = hashlib.md5()
-    md5.update(envelope.get('resource_locator'))
-    doc_id = md5.hexdigest()
-    save_image.delay(envelope.get('resource_locator'))
+def insertDoc(envelope, config, validationResults = {}):
+
+    doc_id = md5_hash(envelope.get('resource_locator'))
+
+    # !!! save_image is effectively an empty stub, when the time comes we can call it again
+    # save_image.delay(envelope.get('resource_locator'))
+
     #normalize casing on all the schemas in the payload_schema array, if payload_schema isn't present use an empty array
     schemas = {schema.lower() for schema in envelope.get('payload_schema', [])}
     mapping = load_standards("standards_mapping.csv")
+
     try:
         doc = None
         if "lr paradata 1.0" in schemas:
@@ -521,18 +521,21 @@ def createRedisIndex(envelope, config):
             doc = process_lom(envelope, mapping)
         else:
            doc = process_generic(envelope)
+
         if doc:
             doc['keys'].append(envelope.get('identity', {}).get("owner"))
-            index(doc, doc_id)
+
+            # add results from validation to doc (whitelisted, blacklisted values)
+            doc.update(validationResults)
+            _send_doc(doc, doc_id)
     except Exception as ex:
         traceback.print_exc()
 
 
 @task(queue="image")
 def save_image(url):
-    m = hashlib.md5()
-    m.update(url)
-    couchdb_id = m.hexdigest()
-#    p = subprocess.Popen(" ".xvfb-run", "--auto-servernum", "--server-num=1", "python", "screenshots.py", url, couchdb_id]), shell=True, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-#    filename = p.communicate()
- #   print(filename)
+    doc_id = md5_hash(url)
+
+    # p = subprocess.Popen(" ".xvfb-run", "--auto-servernum", "--server-num=1", "python", "screenshots.py", url, doc_id]), shell=True, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # filename = p.communicate()
+    # print(filename)

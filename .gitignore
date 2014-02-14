@@ -4,3 +4,4 @@ env
 *.jpg
 *~
 src/celeryd@*
+.DS_Store

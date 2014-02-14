@@ -1,0 +1,2 @@
+*.bloom
+.celery_workers

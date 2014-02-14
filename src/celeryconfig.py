@@ -1,31 +1,37 @@
 from datetime import timedelta
+
 config = {
     "lrUrl": "https://node01.public.learningregistry.net/harvest/listrecords",
     "couchdb": {
         "dbUrl": "http://localhost:5984/lr-data",
         "standardsDb": "http://localhost:5984/standards",
     },
-    "insertTask": "tasks.save.createRedisIndex",
-    "validationTask": "tasks.validate.checkWhiteList",
+    "tasks": {
+        "insert": "tasks.elasticsearch.save.insertDoc",
+        "validation": "tasks.validate.checkWhiteList",
+    },
     "redis": {
         "host": "localhost",
         "port": 6379,
         "db": 0
     },
-    "riak": {
-        "port": "10017",
+    "elasticsearch": {
+        "protocol": "http",
         "host": "localhost",
-        "protocol": "pbc"
+        "port": "9200",
+        "bulk_size": 400,
+        "timeout": 30.0
     }
 }
 # List of modules to import when celery starts.
-CELERY_IMPORTS = ("tasks.harvest", "tasks.save", "tasks.validate", )
+CELERY_IMPORTS = ("tasks.harvest", "tasks.save", "tasks.validate", "tasks.elasticsearch.save", )
 
 ## Result store settings.
 ## Broker settings.
 BROKER_URL = 'amqp://'
 CELERY_LOG_DEBUG = "TRUE"
-CELERY_LOG_FILE = "./celeryd.log"
+CELERY_LOG_FILE = "./logs/celeryd-%n.log"
+CELERY_PID_FILE = "./run/celeryd-%n.pid"
 CELERY_LOG_LEVEL = "DEBUG"
 BROKER_TRANSPORT_OPTIONS = {'visibility_timeout': 30}
 #BROKER_POOL_LIMIT = None

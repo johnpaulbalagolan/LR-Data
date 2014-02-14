@@ -2,60 +2,80 @@
 This is a small utility to help pull the data from the Learning Registry into a datastore of you choice.
 
 # Dependencies
-## LR-Data requires 
-###RabbitMQ
-###Redis
-###Python
-###Celery
+## LR-Data requires the following services/libraries
+ * RabbitMQ
+ * Redis
+ * Python
+ * Celery
 
 #Setup
-Run `pip install -U -r requirements.txt`
+	# Create virtual environment
+	virtualenv env
+	. env/bin/activate
+	# Install python library requirements
+	pip install -U -r requirements.txt
 
 #Configuration
-All configuration is done in the src/celeryconfig.py file.  For information of configuring Celery please see their [document](http://celery.readthedocs.org/en/latest/index.html).  For lr-data configuration modify 
+All configuration is done in the src/celeryconfig.py file.  For information of configuring Celery please see their [document](http://celery.readthedocs.org/en/latest/index.html).  For lr-data configuration modify
 
     config = {
 
-	"lrUrl": "http://lrdev02.learningregistry.org/harvest/listrecords",
+		"lrUrl": "http://lrdev02.learningregistry.org/harvest/listrecords",
 
-	"mongodb":{	
+		"couchdb":{
 
-		"database":"lr",
+			"dbUrl":"http://localhost:5984/lr-data"
 
-		"collection":"envelope",
+		},
+		"tasks": {
+			"insert": "tasks.save.insertDocumentMongo",
 
-		"host": "localhost",
+			"validation": "tasks.validate.emptyValidate",
+		}
 
-		"port": 27017,
+		"redis":{
 
-	},
+			"host":"localhost",
 
-	"couchdb":{
+			"port":6379,
 
-		"dbUrl":"http://localhost:5984/lr-data"
+			"db":0
+		}
 
-	},
+		"mongodb":{
 
-	"insertTask":"tasks.save.insertDocumentMongo",
+			"database":"lr",
 
-	"validationTask":"tasks.validate.emptyValidate",
+			"collection":"envelope",
 
-	"redis":{
+			"host": "localhost",
 
-		"host":"localhost",
+			"port": 27017,
 
-		"port":6379,
-
-		"db":0
-
-	}
-
+		},
     }
 
-set `insertTask` to be the celery task you wish to use to save the data and modify `validationTask` to be your validation task
+Customizable tasks are defined in the `tasks` hash.  `validation` is the task name for validating incoming docs.  `insert` is the task you wish to use to save the data
+
 #Startup
-<<<<<<< HEAD
-To start run `celeryd -B` from the source directory.  To run as a deamon follow these [instructions](http://ask.github.com/celery/cookbook/daemonizing.html)
-=======
-To start run `celryd -B` from the source directory.  To run as a deamon follow these [instructions](http://ask.github.com/celery/cookbook/daemonizing.html)
->>>>>>> 870e29053f6ccf32810f2f5efa6ab9a3783bd6a9
+There are scripts inside of src to get you started.
+
+*  start\_celery\_workers.sh - will start your default worker threads responsible for harvesting, validating, and saving LR data
+*  stop\_celery\_workers.sh - stops workers
+*  start\_harvesting.py - sends harvest request into queue for workers to start working
+
+To start harvesting, activate your virtualenv, start the celery workers, then start harvesting request
+
+	cd src
+	. ../env/bin/activate
+    ./start_celery_workers.sh
+    ./start_harvesting.py
+
+Should you want to stop (or pause) the processing you can stop the celery workers:
+
+	./stop_celery_workers.sh
+
+When you want to resume processing, you need only start the celery workers again:
+
+	./start_celery_workers.sh
+
