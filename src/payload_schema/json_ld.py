@@ -23,7 +23,7 @@ class JsonLdParser(PayloadSchemaParser):
             doc[k].extend(graph_data.get(k, []))
 
         for k in ['title', 'description', 'publisher']:
-            if k not in doc and k in graph_data:
+            if k in graph_data:
                 doc[k] = graph_data[k]
 
     def process_json_ld_graph(self, graph, mapping):

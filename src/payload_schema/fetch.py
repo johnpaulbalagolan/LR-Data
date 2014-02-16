@@ -1,4 +1,11 @@
 from base import PayloadSchemaParser
+import urlparse
+import urllib2
+import requests
+
+from BeautifulSoup import BeautifulSoup
+import nltk
+
 
 class FetchParser(PayloadSchemaParser):
     def _parse(self, doc, envelope, mapping):

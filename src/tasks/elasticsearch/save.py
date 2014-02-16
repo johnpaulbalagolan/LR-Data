@@ -6,12 +6,7 @@ from celeryconfig import config
 import pyes
 
 import urlparse
-import urllib2
-import requests
 import hashlib
-
-from BeautifulSoup import BeautifulSoup
-import nltk
 
 import traceback
 import subprocess
@@ -78,84 +73,6 @@ def _send_doc(doc, doc_id):
     updateResponse = conn.partial_update(INDEX_NAME, DOC_TYPE, doc_id, update_function, upsert=doc, params=doc)
 
     print(updateResponse)
-
-
-
-def get_html_display(url, publisher):
-    try:
-        resp = urllib2.urlopen(url)
-        if not resp.headers['content-type'].startswith('text/html'):
-            return {
-                "title": url,
-                "description": url,
-                "publisher": publisher,
-                "url" :url,
-                "hasScreenshot": False
-                }
-        raw = resp.read()
-        raw = raw.decode('utf-8')
-        soup = BeautifulSoup(raw)
-        title = url
-        if soup.html is not None and \
-                soup.html.head is not None and \
-                soup.html.head.title is not None:
-            title = soup.html.head.title.string
-
-
-        description = None
-
-        # search meta tags for descriptions
-        for d in soup.findAll(attrs={"name": "description"}):
-            print d
-            if d['content'] is not None:
-                description = d['content']
-                break
-
-        # should we not find a description, make one out of the first 100 non-HTML words on the site
-        if description is None:
-            raw = nltk.clean_html(raw)
-            tokens = nltk.word_tokenize(raw)
-            description = " ".join(tokens[:100])
-
-        return {
-            "title": title,
-            "description": description,
-            "url": url,
-            "publisher": publisher,
-            "hasScreenshot": False
-        }
-
-    except Exception as ex:
-        return {
-            "title": url,
-            "description": url,
-            "publisher": publisher,
-            "url": url,
-            "hasScreenshot": False
-        }
-
-def process_generic(envelope):
-    url = envelope['resource_locator']
-
-    doc_id = md5_hash(url)
-
-    keys = envelope['keys']
-    standards = []
-
-    try:
-        doc = get_html_display(url, envelope['identity']['submitter'])
-        doc['keys'] = keys
-        doc['standards'] = standards
-        return doc
-    except Exception as ex:
-        traceback.print_exc()
-        return {
-            "title": url,
-            "description": url,
-            'publisher': envelope['identity']['submitter'],
-            "url" :url,
-            "hasScreenshot": False
-            }
 
 
 def indexDoc(envelope, config, parsedDoc):
