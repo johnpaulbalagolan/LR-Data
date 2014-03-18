@@ -3,7 +3,7 @@ from base import PayloadSchemaParser
 class LrmiParser(PayloadSchemaParser):
     def _parse(self, doc, envelope, mapping):
         url = envelope['resource_locator']
-        resource_data = envelope.get('resource_data', {})
+        resource_data = self._loadJSONResourceData(envelope)
 
         if 'items' in resource_data:
             properties = resource_data['items'].pop().get('properties', {})

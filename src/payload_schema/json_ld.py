@@ -11,8 +11,9 @@ class JsonLdParser(PayloadSchemaParser):
             'hasScreenshot': True,
         })
 
+        resource_data = self._loadJSONResourceData(envelope)
 
-        payload_graph = envelope.get('resource_data', {}).get('@graph')
+        payload_graph = resource_data.get('@graph')
         if not payload_graph:
             payload_graph = [envelope.get('resource_data', {})]
 

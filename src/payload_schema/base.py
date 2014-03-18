@@ -1,4 +1,5 @@
 import traceback
+import json
 
 class PayloadSchemaParser:
     def parse(self, envelope, standardsMapping):
@@ -46,5 +47,18 @@ class PayloadSchemaParser:
             publisher = ''
 
         return publisher
+
+
+    def _loadJSONResourceData(envelope):
+        """ If resource_data is a string, convert it to a JSON object """
+
+        data = envelope.get('resource_data', {})
+
+        if isinstance(data, str) or isinstance(data, unicode):
+            data = json.loads(data)
+
+        return data
+
+
 
 
