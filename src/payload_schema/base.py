@@ -49,7 +49,7 @@ class PayloadSchemaParser:
         return publisher
 
 
-    def _loadJSONResourceData(envelope):
+    def _loadJSONResourceData(self, envelope):
         """ If resource_data is a string, convert it to a JSON object """
 
         data = envelope.get('resource_data', {})
