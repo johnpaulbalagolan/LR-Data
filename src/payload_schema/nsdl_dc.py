@@ -34,3 +34,6 @@ class NsdlDcParser(PayloadSchemaParser):
 
         doc['standards'] = final_standards
 
+
+        subjects = dom.xpath('/nsdl_dc:nsdl_dc/dc:subject', namespaces=dc_namespaces)
+        doc['keys'].extend([s.text for s in subjects])

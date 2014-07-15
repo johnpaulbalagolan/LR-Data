@@ -30,7 +30,7 @@ def getParser(envelope):
 
     schemas = {schema.lower() for schema in envelope.get('payload_schema', [])}
 
-    if 'nsdl_dc' in schemas:
+    if 'nsdl_dc' in schemas or "nsdl dc 1.02.020" in schemas:
         return NsdlDcParser()
 
     elif 'lrmi' in schemas and not "json-ld" in schemas:
