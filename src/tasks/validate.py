@@ -10,6 +10,8 @@ from helpers.tasks import getTaskFunction
 from helpers.bloom import getBloomFilter
 import helpers.parsers
 
+import redis
+
 black_list = set(["bit.ly", "goo.gl", "tinyurl.com", "fb.me", "j.mp", "su.pr", 'www.freesound.org'])
 good_codes = [requests.codes.ok, requests.codes.moved, requests.codes.moved_permanently]
 
@@ -26,6 +28,18 @@ BLACKLIST_FILTER_FILE = "blacklist_filter.bloom"
 # Only index items that we have a valid parser for
 def checkParsable(envelope, config, validationResult):
     validationResult['valid'] = helpers.parsers.canParse(envelope)
+
+    if not validationResult['valid']:
+
+        if('redisInstance' not in config):
+            config['redisInstance'] = redis.StrictRedis(host=config['redis']['host'],
+                                  port=config['redis']['port'],
+                                  db=config['redis']['db'])
+
+
+        for schema in helpers.parsers.getPayloadSchemas(envelope):
+            config['redisInstance'].sadd('invalid_schemas', schema)
+
 
 def translate_url(url_parts):
     r = re.compile("\w+:\d+")

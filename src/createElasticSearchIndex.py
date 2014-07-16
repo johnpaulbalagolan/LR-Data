@@ -8,12 +8,18 @@ es = pyes.ES(
     bulk_size=config['elasticsearch']['bulk_size']
 )
 
+index_name = config['elasticsearch']['index_name']
+
 index_config = {
     'analysis': {
         'analyzer': {
             'default': {
                 'tokenizer': 'standard',
                 'filter': ['standard', 'lowercase', 'snowball']
+            },
+            "full_keyword": {
+                'tokenizer': 'keyword',
+                'filter': ['standard', 'lowercase']
             }
         },
         'filter': {
@@ -62,13 +68,28 @@ mapping = {
             }
         }
     },
-    # Keys will use standard analyzer to split into individual words
+
+    # keys will use standard analyzer to split into individual words
+    # keys_full will be the original multi-word key with a simple (lowercase) filter applied
     "keys": {
-        "index": "analyzed",
-        "store": "no",
-        "type": "string",
-        "analyzer": "standard"
+        "type": "multi_field",
+        "path": "just_name",
+        "fields": {
+            "keys": {
+                "index": "analyzed",
+                "store": "no",
+                "type": "string",
+                "analyzer": "standard"
+            },
+            "keys_full": {
+                "index": "analyzed",
+                "store": "no",
+                "type": "string",
+                "analyzer": "full_keyword"
+            }
+        }
     },
+
     # Standards will be in the form S0000000, no need to analyze
     "standards": {
         "index": "not_analyzed",
@@ -130,10 +151,10 @@ mapping = {
 }
 
 # remove our existing LR index
-es.delete_index_if_exists('lr')
+es.delete_index_if_exists(index_name)
 
 # create a new index
-es.create_index_if_missing('lr', { 'index': index_config })
+es.create_index_if_missing(index_name, { 'index': index_config })
 
 # add mapping properties for lr_doc type
-es.put_mapping("lr_doc" ,{'properties':mapping}, ["lr"])
+es.put_mapping(config['elasticsearch']['doc_type'] ,{'properties':mapping}, [index_name])

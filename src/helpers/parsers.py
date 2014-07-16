@@ -28,7 +28,7 @@ def canParse(envelope):
 
 def getParser(envelope):
 
-    schemas = {schema.lower() for schema in envelope.get('payload_schema', [])}
+    schemas = getPayloadSchemas(envelope)
 
     if 'nsdl_dc' in schemas or "nsdl dc 1.02.020" in schemas:
         return NsdlDcParser()
@@ -46,5 +46,8 @@ def getParser(envelope):
         return LomParser()
 
     return None
+
+def getPayloadSchemas(envelope):
+    return { schema.lower() for schema in envelope.get('payload_schema', []) }
 
 

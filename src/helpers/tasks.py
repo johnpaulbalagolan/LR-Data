@@ -42,7 +42,7 @@ def executeValidateStack(envelope, config, enqueueNextTask = True):
             loadFunction(funcName)(envelope, config, validationResults)
 
             if not validationResults['valid']:
-                print "Failed validation on "+funcName
+                # print "Failed validation on "+funcName
                 break
 
 
