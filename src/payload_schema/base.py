@@ -25,6 +25,7 @@ class PayloadSchemaParser:
             'url': url,
             'keys': envelope.get('keys', []),
             'hasScreenshot': False,
+            'grades': [ i[6:] for i in envelope.get('keys', []) if i.lower()[:6] == 'grade ' ],
         }
 
     def identify_publisher(self, envelope):
@@ -54,11 +55,12 @@ class PayloadSchemaParser:
 
         data = envelope.get('resource_data', {})
 
-        if isinstance(data, str) or isinstance(data, unicode):
+        if self.is_string(data):
             data = json.loads(data)
 
         return data
 
-
-
+    # helper function to cope with string vs unicode
+    def is_string(self, value):
+        return isinstance(value, str) or isinstance(value, unicode)
 

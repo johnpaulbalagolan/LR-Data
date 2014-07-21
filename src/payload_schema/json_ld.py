@@ -1,6 +1,7 @@
 from base import PayloadSchemaParser
 
 import urlparse
+from pprint import pprint
 
 class JsonLdParser(PayloadSchemaParser):
     def _parse(self, doc, envelope, mapping):
@@ -15,12 +16,12 @@ class JsonLdParser(PayloadSchemaParser):
 
         payload_graph = resource_data.get('@graph')
         if not payload_graph:
-            payload_graph = [envelope.get('resource_data', {})]
+            payload_graph = [resource_data]
 
 
         graph_data = self.process_json_ld_graph(payload_graph, mapping)
 
-        for k in ['keys', 'standards', 'accessMode', 'mediaFeatures']:
+        for k in ['keys', 'standards', 'accessMode', 'mediaFeatures', 'grades']:
             doc[k].extend(graph_data.get(k, []))
 
         for k in ['title', 'description', 'publisher']:
@@ -31,11 +32,14 @@ class JsonLdParser(PayloadSchemaParser):
         data = {}
         keys = []
         standards = []
+        grades = []
         media_features = []
         access_mode = []
         for node in graph:
             keys.extend(self.handle_keys_json_ld(node))
             standards.extend(self.handle_standards_json_ld(node, mapping))
+            grades.extend(self.handle_grades_json_ld(node))
+
             if 'accessMode' in node:
                 accessMode = node['accessMode']
                 if isinstance(accessMode, list):
@@ -57,11 +61,11 @@ class JsonLdParser(PayloadSchemaParser):
                 else:
                     keys.append(t)
             if 'name' in node and 'title' not in data:
-                data['title'] = self.get_first_or_value(node, 'name', lambda x: isinstance(x, str) or isinstance(x, unicode))
+                data['title'] = self.get_first_or_value(node, 'name', self.is_string)
             if "description" in node and 'description' not in data:
-                data['description'] = self.get_first_or_value(node, 'description', lambda x: isinstance(x, str) or isinstance(x, unicode))
+                data['description'] = self.get_first_or_value(node, 'description', self.is_string)
             if 'publisher' in node:
-                pub = self.get_first_or_value(node, 'publisher', lambda x: isinstance(x, str) or isinstance(x, unicode))
+                pub = self.get_first_or_value(node, 'publisher', lambda x: self.is_string(x) or isinstance(x, dict))
                 if isinstance(pub, dict):
                     data['publisher'] = pub.get('name', '')
                 else:
@@ -70,6 +74,7 @@ class JsonLdParser(PayloadSchemaParser):
         data['standards'] = standards
         data['accessMode'] = set(access_mode)
         data['mediaFeatures'] = set(media_features)
+        data['grades'] = set(grades)
 
         return data
 
@@ -79,45 +84,96 @@ class JsonLdParser(PayloadSchemaParser):
         elif isinstance(data[key], list):
             return data[key].pop()
 
-    def handle_standards_json_ld(self, node, mapping):
-        standards = []
-        if 'educationalAlignment' in node:
-            alignments = (n['targetName'] for n in node['educationalAlignment'] if 'targetName' in n and n.get('educationalFramework','').lower().strip() == "common core state standards")
+    def get_educational_alignments_by_framework(self, node, frameworks):
 
-            alignments = (n['targetName']
-                for n in node['educationalAlignment'] \
-                    if 'targetName' in n \
+        if self.is_string(frameworks):
+            frameworks = [frameworks]
+
+        frameworks = [i.lower() for i in frameworks]
+
+        if 'educationalAlignment' in node:
+
+            edAlignment = node['educationalAlignment']
+
+            # Compensate for EZ-Publish not producing proper lists when only a single object is defined for educationalAlignment
+            if(isinstance(edAlignment, dict)):
+                edAlignment = [edAlignment]
+
+            alignments = (n
+                for n in edAlignment \
+                    if 'targetName' in n  and 'educationalFramework' in n\
                         and ( \
-                            (isinstance(n.get('educationalFramework',''), str) and n.get('educationalFramework','').lower().strip() == "common core state standards") \
-                            or (isinstance(n.get('educationalFramework',''), list) and n.get('educationalFramework',[]).pop().lower().strip() == "common core state standards") \
+                            (self.is_string(n['educationalFramework']) and n['educationalFramework'].lower().strip() in frameworks) \
+                            or (isinstance(n['educationalFramework'], list) and len(n['educationalFramework']) and n['educationalFramework'].pop().lower().strip() in frameworks) \
                         ) \
                     )
 
-            for alignment in alignments:
-                if isinstance(alignment, str):
-                    standards.extend(mapping.get(alignment, alignment))
-                elif isinstance(alignment, list):
-                    for aln in alignment:
-                        standards.extend(mapping.get(aln, aln))
+            return alignments
+
+
+        return []
+
+
+    def handle_standards_json_ld(self, node, mapping):
+        standards = []
+
+        framework = [
+            "Common Core State Standards",
+            "Common Core State Standards for Math",
+            "Common Core State Standards for English Language Arts"
+        ]
+
+        standardValues = [ i['targetName'] for i in self.get_educational_alignments_by_framework(node, framework) ]
+
+        for standardName in standardValues:
+
+            if self.is_string(standardName):
+                standardNames = [standardName]
+            else:
+                standardNames = standardName[:]
+
+            for standard in standardNames:
+                standards.extend(mapping.get(standard.lower(), [standard]))
 
         return standards
+
+    def handle_grades_json_ld(self, node):
+        grades = []
+
+        framework = "US K-12 Grade Levels"
+
+        gradeValues = [ i['targetName'] for i in self.get_educational_alignments_by_framework(node, framework) ]
+
+        for grade in gradeValues:
+            if self.is_string(grade):
+                grades.extend(grade.split(','))
+            elif isinstance(alignment, list):
+                for g in grade:
+                    grades.extend(g.split(','))
+
+        return grades
 
     def handle_keys_json_ld(self, node):
         keys = []
         target_elements = ['inLanguage', 'isbn', 'provider',
                            'learningResourceType', 'keywords',
                            'educationalUse', 'author', "intendedUserRole"]
+
         def handle_possible_dict(data):
             if isinstance(data, dict):
                 return data.get('name')
             return data
-        for k in target_elements:
 
+
+        for k in target_elements:
             if k in node:
-                if isinstance(node[k], str):
-                    keys.append(handle_possible_dict(node[k]))
+                if self.is_string(node[k]):
+                    keys.extend(node[k].split(','))
                 elif isinstance(node[k], list):
-                    keys.extend([handle_possible_dict(k) for k in node[k]])
+                    keys.extend([handle_possible_dict(i) for i in node[k]])
+                elif isinstance(node[k], dict):
+                    keys.append(handle_possible_dict(node[k]))
+
         if "bookFormat" in node:
             bookFormat = node['bookFormat']
             #increment the rfind result by 1 to exclude the '/' character
@@ -128,8 +184,8 @@ class JsonLdParser(PayloadSchemaParser):
             parts = urlparse.urlparse(url)
             qs = urlparse.parse_qs(parts.query)
             if 'downloadFormat' in qs:
-                if isinstance(qs['downloadFormat'], str):
-                    keys.append(qs['downloadFOrmat'])
+                if self.is_string(qs['downloadFormat']):
+                    keys.append(qs['downloadFormat'])
                 else:
                     keys.extend(qs['downloadFormat'])
         return keys

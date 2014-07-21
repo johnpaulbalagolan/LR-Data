@@ -115,6 +115,14 @@ mapping = {
         "include_in_all": "false",
     },
 
+    # Grade levels (K, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+    "grades": {
+        "index": "analyzed",
+        "type": "string",
+        "analyzer": "full_keyword",
+        "store": "no",
+    },
+
     # url should be unanalyzed for lookup
     "url": {
         "index": "not_analyzed",

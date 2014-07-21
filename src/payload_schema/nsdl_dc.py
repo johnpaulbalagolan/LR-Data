@@ -37,3 +37,6 @@ class NsdlDcParser(PayloadSchemaParser):
 
         subjects = dom.xpath('/nsdl_dc:nsdl_dc/dc:subject', namespaces=dc_namespaces)
         doc['keys'].extend([s.text for s in subjects])
+
+        grades = dom.xpath('/nsdl_dc:nsdl_dc/dct:educationLevel', namespaces=dc_namespaces)
+        doc['grades'].extend([g.text.lower().replace('grade ', '') for g in grades])

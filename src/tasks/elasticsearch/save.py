@@ -58,14 +58,20 @@ def _send_doc(doc, doc_id):
           if(!ctx._source.accessMode.contains(key)){
             ctx._source.accessMode.add(key);
           }
+        }
+        for(String grade : grades){
+          if(!ctx._source.grades.contains(grade)){
+            ctx._source.grades.add(grade);
+          }
         }"""
 
-    doc['keys'] = set([x for x in doc.get('keys', []) if x is not None])
-
-    for k, v in [('publisher', None), ('mediaFeatures', []), ('accessMode', []), ("description", None), ('standards', [])]:
+    for k, v in [('publisher', None), ('mediaFeatures', []), ('accessMode', []), ("description", None), ('standards', []), ('grades', [])]:
         if k not in doc:
             doc[k] = v
 
+    doc['keys'] = set([x for x in doc.get('keys', []) if x is not None])
+    doc['grades'] = set([x for x in doc.get('grades', []) if x is not None])
+    doc['standards'] = set([x for x in doc.get('standards', []) if x is not None])
 
     if(doc['url']):
         doc['url_domain'] = urlparse.urlparse(doc['url']).netloc

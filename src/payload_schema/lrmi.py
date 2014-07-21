@@ -19,6 +19,11 @@ class LrmiParser(PayloadSchemaParser):
             for s in ids:
                 standards.append(s)
 
+
+        for props in educational_alignment_properties:
+            if props.get('type') == 'alignmentType':
+                doc['keys'].push(props.get('target_name'))
+
         if 'publisher' in properties:
             doc['publisher'] = properties.get('publisher', []).pop().get('name')
 
@@ -32,6 +37,11 @@ class LrmiParser(PayloadSchemaParser):
 
 
         doc['keys'].extend(properties.get('about', []))
+
+        keywords = properties.get('keywords', '')
+
+        if keywords is not "":
+            docs['keys'].extend([i.trim() for i in keywords.split(',')])
 
         doc.update({
             'title': name,
