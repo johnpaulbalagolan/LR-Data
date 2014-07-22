@@ -29,6 +29,8 @@ class LrmiParser(PayloadSchemaParser):
 
 
         name = properties.get('name')
+        description = ''
+
         if isinstance(name, list):
             name = name.pop()
             description = properties.get('description')
