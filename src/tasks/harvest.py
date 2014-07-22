@@ -65,12 +65,14 @@ def harvestData(lrUrl, config, enqueueValidate = True):
             envelope = i['record']['resource_data']
             r.sadd("harvested_docs", envelope['doc_ID'])
 
-            validateFunc = getTaskFunction(config, 'validate')
+            # only attempt to process metadata resource types (ignore paradata and other non-metadata records)
+            if 'resource_data_type' in envelope and envelope['resource_data_type'] == 'metadata':
+                validateFunc = getTaskFunction(config, 'validate')
 
-            if enqueueValidate:
-                validateFunc.delay(envelope, config)
-            else:
-                validateFunc(envelope, config)
+                if enqueueValidate:
+                    validateFunc.delay(envelope, config)
+                else:
+                    validateFunc(envelope, config)
 
 
         if "resumption_token" in data and \
