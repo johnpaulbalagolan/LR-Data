@@ -56,8 +56,6 @@ def checkWhiteList(envelope, config, validationResult):
     blacklistFilter = getBloomFilter(BLACKLIST_DOMAINS, BLACKLIST_FILTER_FILE)
 
     parts = urlparse(envelope['resource_locator'])
-    if "lr-test-data-slice-jbrecht" in envelope['keys']:
-        return
     if parts.netloc == "3dr.adlnet.gov":
         envelope['resource_locator'] = translate_url(parts)
 
