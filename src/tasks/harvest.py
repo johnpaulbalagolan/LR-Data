@@ -9,7 +9,7 @@ import requests
 import json
 import urllib
 from urlparse import urlparse, urlunparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import traceback
 
 log = get_default_logger()
@@ -28,6 +28,12 @@ def startHarvest(config):
         except:
             pass
         until = datetime.utcnow().isoformat() + "Z"
+
+        #byPassFrom = datetime.utcnow() - timedelta(days=10)
+        #byPassUntil = datetime.utcnow() - timedelta(days=270)
+        #fromDate = byPassFrom.isoformat() + "Z"
+        #until = byPassUntil.isoformat() + "Z"
+
         r.set("lastHarvestTime", until)
         urlParts = urlparse(lrUrl)
         params = {"until": until}

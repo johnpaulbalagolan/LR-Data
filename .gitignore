@@ -5,3 +5,5 @@ env
 *~
 src/celeryd@*
 .DS_Store
+*.sublime-project
+*.sublime-workspace
